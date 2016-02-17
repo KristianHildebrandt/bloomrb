@@ -1,17 +1,22 @@
 require 'socket'
 
 class Bloomrb
-  attr_accessor :host, :port, :retries
+  attr_accessor :host, :port, :retries, :protocol
 
-  def initialize(host = 'localhost', port = 8673, retries = 5)
-    self.host    = host
-    self.port    = port
-    self.retries = retries
+  def initialize(host: 'localhost', port: 8673, retries: 5, protocol: :tcp)
+    self.host     = host
+    self.port     = port
+    self.retries  = retries
+    self.protocol = protocol
   end
 
   def socket
-    @socket ||= TCPSocket.new(host, port).tap do |socket|
-      socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+    @socket ||= begin
+      if protocol == :udp
+        udp_socket
+      else
+        tcp_socket
+      end
     end
   end
 
@@ -92,6 +97,19 @@ class Bloomrb
   end
 
   protected
+
+  def udp_socket
+    s = UDPSocket.new(Socket::AF_INET)
+    s.bind(host, port)
+
+    s
+  end
+
+  def tcp_socket
+    TCPSocket.new(host, port).tap do |socket|
+      socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+    end
+  end
 
   def execute *args
     opts = Hash === args.last ? args.pop : {}
